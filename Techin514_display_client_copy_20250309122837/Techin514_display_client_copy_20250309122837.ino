@@ -7,13 +7,31 @@
 #include "BLEDevice.h" //#include "BLEScan.h"
 #include <Stepper.h>  // stepper motor library
 
-
+////orginal stepper motor code
 // Define stepper motor parameters
-#define STEPS_PER_REV 200  // Steps per revolution (adjust per motor specs)
-#define STEP_PIN_1 0       // Stepper motor pin 1
-#define STEP_PIN_2 1       // Stepper motor pin 2
-#define STEP_PIN_3 2      // Stepper motor pin 3
-#define STEP_PIN_4 3      // Stepper motor pin 4
+// #define STEPS_PER_REV 200  // Steps per revolution (adjust per motor specs)
+// #define STEP_PIN_1 0       // Stepper motor pin 1
+// #define STEP_PIN_2 1       // Stepper motor pin 2
+// #define STEP_PIN_3 2      // Stepper motor pin 3
+// #define STEP_PIN_4 3      // Stepper motor pin 4
+
+// NEW: Define motor control pins
+#define COIL_A1 D0
+#define COIL_A2 D1
+#define COIL_B1 D2
+#define COIL_B2 D3
+
+// NEW: Stepper motor step sequence (full step mode)
+const int stepSequence[4][4] = {
+    {1, 0, 1, 0}, // Step 1
+    {0, 1, 1, 0}, // Step 2
+    {0, 1, 0, 1}, // Step 3
+    {1, 0, 0, 1}  // Step 4
+};
+
+//NEW 
+bool motorForward = false;  
+bool motorBackward = false; 
 
 Stepper stepperMotor(STEPS_PER_REV, STEP_PIN_1, STEP_PIN_2, STEP_PIN_3, STEP_PIN_4);
 
@@ -29,6 +47,40 @@ static boolean connected = false;
 static boolean doScan = false;
 static BLERemoteCharacteristic* pRemoteCharacteristic;
 static BLEAdvertisedDevice* myDevice;
+
+/// Stepper motor
+void setup() {
+    Serial.begin(115200);
+    Serial.println("Starting Arduino BLE Client with Stepper Motor...");
+
+    pinMode(COIL_A1, OUTPUT);
+    pinMode(COIL_A2, OUTPUT);
+    pinMode(COIL_B1, OUTPUT);
+    pinMode(COIL_B2, OUTPUT);
+
+    BLEDevice::init("");
+    BLEScan* pBLEScan = BLEDevice::getScan();
+    pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
+    pBLEScan->setInterval(1349);
+    pBLEScan->setWindow(449);
+    pBLEScan->setActiveScan(true);
+    pBLEScan->start(5, false);
+}
+
+////NEW code for Stepper motor
+void stepMotor(int stepDelay, bool reverse) {
+    for (int i = 0; i < 200; i++) { // Adjust steps per revolution
+        for (int step = 0; step < 4; step++) {
+            int s = reverse ? (3 - step) : step; // Reverse direction if needed
+            digitalWrite(COIL_A1, stepSequence[s][0]);
+            digitalWrite(COIL_A2, stepSequence[s][1]);
+            digitalWrite(COIL_B1, stepSequence[s][2]);42
+            digitalWrite(COIL_B2, stepSequence[s][3]);
+            delay(stepDelay); // Adjust speed (smaller delay = faster motor)
+        }
+    }
+}
+
 
 // TODO: define new global variables for data collection
 
@@ -55,16 +107,27 @@ static void notifyCallback(
     if (length > 0) {
         if (pData[0] == '1') {  // If received '1', move stepper forward
             Serial.println("Moving stepper forward...");
-            stepperMotor.step(100);  // Move 100 steps forward
+            // stepperMotor.step(100);  // Move 100 steps forward
+            motorForward = true;
+            motorBackward = false;        
         } 
         else if (pData[0] == '0') {  // If received '0', move stepper backward
             Serial.println("Moving stepper backward...");
-            stepperMotor.step(-100);  // Move 100 steps backward
+            // stepperMotor.step(-100);  // Move 100 steps backward
+            motorForward = false;
+            motorBackward = true;
+        }
+        else {  // **任何其他数据，停止电机**
+            Serial.println("Stopping stepper motor...");
+            motorForward = false;
+            motorBackward = false;
         }
     }
 
 }
 
+
+// BLE connection (Don't change)
 class MyClientCallback : public BLEClientCallbacks {
   void onConnect(BLEClient* pclient) {
   }
@@ -75,6 +138,7 @@ class MyClientCallback : public BLEClientCallbacks {
   }
 };
 
+// BLE connection (Don't change)
 bool connectToServer() {
     Serial.print("Forming a connection to ");
     Serial.println(myDevice->getAddress().toString().c_str());
@@ -151,14 +215,15 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
   } // onResult
 }; // MyAdvertisedDeviceCallbacks
 
-void setup() {
-  Serial.begin(115200);
-  Serial.println("Starting Arduino BLE Client application...");
-  BLEDevice::init("");
+// void setup() {
+//   Serial.begin(115200);
+//   Serial.println("Starting Arduino BLE Client application...");
+//   BLEDevice::init("");
 
-  // Initialize the stepper motor
-  stepperMotor.setSpeed(60);  // Set stepper speed (RPM)
 
+////orginal stepper motor code
+  // // Initialize the stepper motor
+  // stepperMotor.setSpeed(60);  // Set stepper speed (RPM)
 
   // Retrieve a Scanner and set the callback we want to use to be informed when we
   // have detected a new device.  Specify that we want active scanning and start the
@@ -196,6 +261,21 @@ void loop() {
   }else if(doScan){
     BLEDevice::getScan()->start(0);  // this is just example to start scan after disconnect, most likely there is better way to do it in arduino
   }
-  stepperMotor.step(100);
-  delay(1000); // Delay a second between loops.
+
+
+  ///orginal code
+  // stepperMotor.step(100);
+  // delay(1000); // Delay a second between loops.
+
+  //NEW
+  if (motorForward) {
+    Serial.println("Stepper Motor Forward...");
+    stepMotor(10, false);  // **正转**
+  } 
+  else if (motorBackward) {
+    Serial.println("Stepper Motor Backward...");
+    stepMotor(10, true);  // **反转**
+  }
+
+
 } // End of loop
