@@ -44,8 +44,6 @@ void setup() {
     Serial.begin(115200);
     Serial.println("Starting BLE work!");
 
-
-
     if (!bme.begin(0x76)) {
         Serial.println("Could not find a valid BME280 sensor, check wiring!");
         while (1);
@@ -68,14 +66,11 @@ void setup() {
     // pCharacteristic->setValue("Hello World");
 
     char initialData[100];
-    snprintf(initialData, sizeof(initialData), "Temp: %.2f*C, Pres: %.2f hPa, Alt: %.2f m, Hum: %.2f%%",
+    snprintf(initialData, sizeof(initialData), "Temp: %.2f*C, Hum: %.2f%%",
             bme.readTemperature(),
-            bme.readPressure() / 100.0F,
-            bme.readAltitude(SEALEVELPRESSURE_HPA),
             bme.readHumidity());
     pCharacteristic->setValue(initialData);
 
-    
     pService->start();
     // BLEAdvertising *pAdvertising = pServer->getAdvertising();  // this still is working for backward compatibility
     BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
@@ -84,7 +79,7 @@ void setup() {
     pAdvertising->setMinPreferred(0x06);  // functions that help with iPhone connections issue
     pAdvertising->setMinPreferred(0x12);
     BLEDevice::startAdvertising();
-    Serial.println("Characteristic defined! Now you can read it in your phone!");
+    Serial.println("Characteristic defined! Check if the motor is working!");
 }
 
 // void loop() {
@@ -110,14 +105,14 @@ void loop() {
         
         // read bme
         float temperature = bme.readTemperature();
-        float pressure = bme.readPressure() / 100.0F;
-        float altitude = bme.readAltitude(SEALEVELPRESSURE_HPA);
+        // float pressure = bme.readPressure() / 100.0F;
+        // float altitude = bme.readAltitude(SEALEVELPRESSURE_HPA);
         float humidity = bme.readHumidity();
         
         // 格式化数据字符串
         char sensorData[100];
-        snprintf(sensorData, sizeof(sensorData), "Temp: %.2f*C, Pres: %.2f hPa, Alt: %.2f m, Hum: %.2f%%",
-                 temperature, pressure, altitude, humidity);
+        snprintf(sensorData, sizeof(sensorData), "Temp: %.2f*C, Hum: %.2f%%",
+                 temperature, humidity);
         
         // 更新BLE特征值并发送通知
         pCharacteristic->setValue(sensorData);
